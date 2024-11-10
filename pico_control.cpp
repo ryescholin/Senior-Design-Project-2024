@@ -1,37 +1,31 @@
-#include <iostream>
-using namespace std;
+class Pico:
+    def __init__(self, pico_name, closed=True):
+        self.name = pico_name
+        self.is_closed = closed
+        self.openable = True
 
+    def open(self):
+        if self.openable:
+            self.is_closed = False
 
-class Pico {
-private:
-    float currentDemand;
-    float currentReceived;
-    float currentPassing;
-    string name;
+    def perm_open(self):
+        self.is_closed = False
+        self.openable = False
 
-public:
-    Pico(string picoName, float demand) : name(picoName), currentDemand(demand), currentReceived(0), currentPassing(0) {}
+    def close(self):
+        if self.openable:
+            self.is_closed = True
+            print(self.name, "closed")
 
-    float getCurrentDemand() const { return currentDemand; }
-    float getCurrentReceived() const { return currentReceived; }
-    float getCurrentPassing() const { return currentPassing; }
+    def reset_dynamic(self):
+        self.openable = True
 
-    void setCurrentReceived(float curr) { currentReceived = curr; }
-    void setCurrentPassing(float curr) { currentPassing = curr; }
+    def is_breaker_closed(self):
+        return self.is_closed
 
-    void calculatePassing(float remainingRouteDemand) {
-        currentPassing = (currentReceived > currentDemand) ? (currentReceived - currentDemand) : 0;
-    }
+    def get_breaker_name(self):
+        return self.name
 
-    bool checkForFault(float expectedCurrent) {
-        if (currentReceived != expectedCurrent) {
-            cout << "Fault detected at Pico " << name << "! Expected: " << expectedCurrent << "A, but received: " << currentReceived << "A" << endl;
-            return true;
-        }
-        return false;
-    }
-
-    void printStatus() const {
-        cout << "Pico " << name << " - Wants: " << currentDemand << "A, Received: " << currentReceived << "A, Passing: " << currentPassing << "A" << endl;
-    }
-};
+    def breaker_status(self):
+        status = "Closed" if self.is_closed else "Open"
+        print(f"{self.name} - Breaker: {status}")
