@@ -4,7 +4,7 @@ import threading
 class RaspberryPiServer:
     def __init__(self, host, port, max_connections=4):
         """
-        Start pi server.
+        Initialize the Raspberry Pi server.
         :param host: IP address to bind the server.
         :param port: Port to listen for connections.
         :param max_connections: Maximum number of simultaneous connections.
