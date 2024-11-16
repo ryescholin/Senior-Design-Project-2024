@@ -1,4 +1,4 @@
-from server_code import RaspberryPiServer  # Import the RaspberryPiServer class
+from pi_communicator import RaspberryPiServer  # Import the server class
 
 def main():
     # Server configuration
