@@ -1,39 +1,40 @@
-from pi_communicator import RaspberryPiServer  # Import the server class
+import asyncio
+from bluetooth_manager import BluetoothManager
 
-def main():
-    # Server configuration
-    HOST = "0.0.0.0"  # Listen on all interfaces
-    PORT = 5000       # Port to run the server
 
-    # Initialize the server
-    server = RaspberryPiServer(HOST, PORT, max_connections=1)  # Max connections set to 1 for single Pico
-    print("Starting server...")
+async def main():
+    # List of device addresses
+    addresses = ["28:CD:C1:0E:C3:D6", "28:CD:C1:0E:C3:D7"]
 
-    try:
-        # Start the server
-        server.start_server()
+    # Fault limits for each device
+    fault_limits = {
+        "28:CD:C1:0E:C3:D6": 400,
+        "28:CD:C1:0E:C3:D7": 350,
+        "28:CD:C1:11:40:ZE": 300,
+        "28:CD:C1:11:DF:B8": 250
+    }
 
-        # Handle single Pico
-        while True:
-            if server.connections:
-                client_address = list(server.connections.keys())[0]  # Get the first connected client
-                print(f"Connected to Pico: {client_address}")
+    # Create a BluetoothManager
+    manager = BluetoothManager(addresses, fault_limits)
 
-                # Example: Send a message to the Pico
-                server.send_message(client_address, "Hello, Pico!")
+    # Step 1: Connect all devices
+    await manager.connect_all_devices()
 
-                # Example: Receive and process messages from the Pico
-                messages = server.get_received_messages(client_address)
-                for message in messages:
-                    print(f"Received from Pico: {message}")
-            else:
-                print("Waiting for Pico to connect...")
+    # Step 2: Start monitoring devices
+    manager.start_monitoring()
 
-    except KeyboardInterrupt:
-        print("Server shutting down...")
-    finally:
-        # Ensure the server shuts down properly
-        server.shutdown_server()
+    # Step 3: Send commands to devices
+    print("Sending commands to devices...")
+    for address in addresses:
+        await manager.send_command(address, True)  # Close relay
+        await asyncio.sleep(2)  # Wait for 2 seconds
+        await manager.send_command(address, False)  # Open relay
+        await asyncio.sleep(2)
+
+    # Step 4: Get Pico objects
+    picos = manager.get_picos()
+    for address, pico in picos.items():
+        print(f"Pico {pico.name}: Relay is {'Closed' if pico.is_closed else 'Open'}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
