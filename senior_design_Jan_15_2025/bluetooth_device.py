@@ -2,7 +2,6 @@ import asyncio
 from bleak import BleakClient, BleakScanner, uuids
 import logging
 
-
 class BluetoothDevice:
     def __init__(self, address, service_uuid, characteristic_uuid):
         self.address = address
