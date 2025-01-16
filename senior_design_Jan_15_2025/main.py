@@ -1,31 +1,20 @@
-import time
+import asyncio
 from initial_values import setup_initial_values
-from fault_detection import FaultDetection
 
 def main():
-    # Initialize the grid and breakers
-    grid, breakers = setup_initial_values()
+    # Initialize grid and devices
+    grid, pico1, pico2 = setup_initial_values()
+    print("Grid and devices initialized.")
 
-    # Create a fault detector
-    fault_detector = FaultDetection(grid)
+    # Start connecting devices in the grid asynchronously
+    async def initialize_devices():
+        lock = asyncio.Lock()
+        await asyncio.gather(
+            pico1.open_connection(lock),
+            pico2.open_connection(lock)
+        )
 
-    # Simulated currents for testing
-    test_currents_sequence = [
-        200,  # Normal operation
-        360 # faulty operation
-    ]
-
-    # Test each sequence of currents
-    for i, current in enumerate(test_currents_sequence):
-        print(f"\n--- Loop {i + 1}: Simulated Current {current} ---")
-        fault_detector.detect_fault("Route 1", current, breakers)
-
-        # Print the status of each breaker
-        for breaker in breakers.values():
-            print(breaker.status())
-
-        # Pause to simulate time between checks
-        time.sleep(1)
+    asyncio.run(initialize_devices())
 
 if __name__ == "__main__":
     main()

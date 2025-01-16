@@ -1,38 +1,24 @@
 class Route:
-    """
-    Represents a route in the power grid.
-    """
+    #Represents a power grid route.
 
     def __init__(self, name, breakers, end_breaker):
-        """
-        Constructor for Route.
-
-        Parameters:
-        name (str): Name of the route.
-        breakers (list): List of Pico objects representing the route's breakers.
-        end_breaker (Pico): The end breaker for the route.
-        """
+        # Initialize with name, breakers, and end breaker
         self.name = name
         self.breakers = breakers
         self.end_breaker = end_breaker
         self.fault_occurred = False
 
-    def mark_faulty(self):
-        """Marks the route as faulty and disables power to the end breaker."""
+    async def mark_faulty(self):
+        # Mark route as faulty and disable end breaker
         self.fault_occurred = True
         print(f"{self.name}: Fault occurred. Cannot supply power.")
-        self.end_breaker.update_connection_status(self.name, False)
-        self.end_breaker.open()
+        await self.end_breaker.update_connection_status(self.name, False)
+        await self.end_breaker.open()
 
-    def try_power_end_pico(self):
-        """
-        Attempts to restore power to the end breaker via alternate connections.
-
-        Returns:
-        None
-        """
+    async def try_power_end_pico(self):
+        # Attempt to restore power to end breaker
         if self.end_breaker.can_provide_power():
-            print(f"{self.name}: Power restored through an alternate connection.")
-            self.end_breaker.close()
+            print(f"{self.name}: Power restored via alternate connection.")
+            await self.end_breaker.close()
         else:
-            print(f"{self.name}: No alternate power source available. Route cannot be powered.")
+            print(f"{self.name}: No alternate power source available.")
