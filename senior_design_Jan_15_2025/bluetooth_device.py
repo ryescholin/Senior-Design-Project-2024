@@ -1,113 +1,98 @@
+import argparse
 import asyncio
-from bleak import BleakClient, BleakScanner, uuids
+import contextlib
 import logging
+from bleak import BleakClient, uuids, BleakScanner
 
 class BluetoothDevice:
-    def __init__(self, address, service_uuid, characteristic_uuid):
+    def __init__(self, address: str, fault_upper_limit=400, closed=True, connections=None):
+        # Initialize Bluetooth device with address and parameters
         self.address = address
-        self.service_uuid = service_uuid
-        self.characteristic_uuid = characteristic_uuid
-        self.current = None
+        self.write_characteristic_uuid = uuids.normalize_uuid_16(0x2A6E)
+        self.read_uuid = uuids.normalize_uuid_16(0x2A6F)
         self.relay_state = None
         self.client = None
-        self.connected = False
+        self.fault_upper_limit = fault_upper_limit
+        self.is_closed = closed
+        self.perm_open = False
+        self.connections = connections or {}
+        self.current = 0
 
-    async def connect(self, lock):
-        async with lock:
-            if self.connected:
-                logging.warning(f"Device {self.address} is already connected.")
-                return
-            logging.info(f"Scanning for device: {self.address}")    
-            device = await BleakScanner.find_device_by_address(self.address)
-            if not device:
-                logging.error(f"Device {self.address} not found.")
-                return
-            logging.info(f"Found device: {self.address}, attempting to connect...")
-            self.client = BleakClient(device)
+    async def read_from_device(self):
+        # Continuously read data from the device
+        while self.client.is_connected:
+            response = await self.client.read_gatt_char(self.read_uuid)
+            logging.info("Received response from %s: %s", self.client.address, response.decode())
+            await asyncio.sleep(5)
+
+    async def switch_relay(self):
+        # Switch relay state based on current configuration
+        if self.relay_state is not None:
+            message = "True" if self.relay_state else "False"
             try:
-                await self.client.connect()
-                self.connected = True
-                logging.info(f"Connected to {self.address}")
+                await self.client.write_gatt_char(self.write_characteristic_uuid, message.encode("utf-8"))
+                logging.info("Sent message to %s: %s", self.address, message)
             except Exception as e:
-                logging.error(f"Error connecting to {self.address}: {e}")
+                logging.error("Error switching relay for %s: %s", self.address, e)
+            self.relay_state = None
+        await asyncio.sleep(5)
 
-    async def disconnect(self):
-        if self.client and self.connected:
-            try:
-                await self.client.disconnect()
-                self.connected = False
-                logging.info(f"Disconnected from {self.address}")
-            except Exception:
-                pass
+    async def open_connection(self, lock: asyncio.Lock):
+        # Establish connection with the Bluetooth device
+        logging.info("Starting task for device with address %s", self.address)
+        async with contextlib.AsyncExitStack() as stack:
+            async with lock:
+                self.client = BleakClient(self.address)
+                print("Connecting to %s", self.address)
+                await stack.enter_async_context(self.client)
+                print("Connected to %s", self.address)
+                stack.callback(logging.info, "disconnecting from %s", self.address)
+            read_task = asyncio.create_task(self.read_from_device())
+            write_task = asyncio.create_task(self.switch_relay())
+            await asyncio.gather(read_task, write_task)
+        logging.info("Disconnected from %s", self.address)
 
-    async def start_notifications(self):
-        if not self.connected:
-            logging.error(f"Device {self.address} is not connected.")
+    async def open(self):
+        self.is_closed = False
+        logging.info("%s opened.", self.address)
+
+    async def perm_open_breaker(self):
+        # Permanently open the device
+        self.is_closed = False
+        self.perm_open = True
+        logging.info("%s permanently opened.", self.address)
+
+    async def close(self):
+        # Close the device if not permanently opened
+        if self.perm_open:
+            logging.info("%s cannot close, permanently opened.", self.address)
             return
+        self.is_closed = True
+        logging.info("%s closed.", self.address)
 
-        def notification_handler(_, data):
-            logging.info(f"{self.address} received: {data}")
-            try:
-                decoded_data = data.decode("utf-8")
-                if decoded_data.isdigit():
-                    self.current = float(decoded_data)
-                elif decoded_data in ["True", "False"]:
-                    self.relay_state = decoded_data == "True"
-            except Exception:
-                pass
-
-        try:
-            await self.client.start_notify(self.characteristic_uuid, notification_handler)
-        except Exception:
-            pass
-
-    async def stop_notifications(self):
-        if self.client and self.connected:
-            try:
-                await self.client.stop_notify(self.characteristic_uuid)
-            except Exception:
-                pass
-
-    async def switch_relay(self, state: bool):
-        if not self.connected:
-            logging.error(f"Device {self.address} is not connected.")
-            return
-        message = "True" if state else "False"
-        try:
-            await self.client.write_gatt_char(self.characteristic_uuid, message.encode("utf-8"))
-            logging.info(f"Sent to {self.address}: {message}")
-            self.relay_state = state
-        except Exception as e:
-                logging.error(f"Error sending message to {self.address}: {e}")
+    def is_fault(self): return self.current > self.fault_upper_limit
+    def can_provide_power(self): return any(self.connections.values())
 
 
+    def update_connection_status(self, connection_name, status):
+        # Update the status of a specific connection
+        if connection_name in self.connections:
+            self.connections[connection_name] = status
+            logging.info("%s connection '%s' updated to %s.", self.address, connection_name, "active" if status else "inactive")
+
+# Change relay state outside the async loop
+async def change_relay_state(device, new_state):
+    async with asyncio.Lock():
+        device.relay_state = new_state
+        logging.info("Relay state for %s set to %s", device.address, "ON" if new_state else "OFF")
+
+# Create multiple Bluetooth device instances and toggle relays
 async def main():
     lock = asyncio.Lock()
-    devices = [
-        BluetoothDevice("28:CD:C1:0E:C3:D6", uuids.normalize_uuid_16(0x1848), uuids.normalize_uuid_16(0x2A6E)),
-        BluetoothDevice("28:CD:C1:0E:C3:D7", uuids.normalize_uuid_16(0x1848), uuids.normalize_uuid_16(0x2A6E)),
-    ]
-
-    async def setup_device(device):
-        await device.connect(lock)
-        if device.connected:
-            await device.start_notifications()
-
-    try:
-        await asyncio.gather(*(setup_device(device) for device in devices))
-        await asyncio.gather(
-            devices[0].switch_relay(True),
-            devices[1].switch_relay(True),
-        )
-        await asyncio.sleep(10)
-    finally:
-        await asyncio.gather(*(device.stop_notifications() for device in devices))
-        await asyncio.gather(*(device.disconnect() for device in devices))
-
+    MAC_ADDRESSES = ["28:CD:C1:11:90:2E", "28:CD:C1:0E:C3:D7"]
+    devices = [BluetoothDevice(mac) for mac in MAC_ADDRESSES]
+    await asyncio.gather(*(device.open_connection(lock) for device in devices))
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)-15s %(name)-8s %(levelname)s: %(message)s",
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(name)-8s %(levelname)s: %(message)s")
     asyncio.run(main())
