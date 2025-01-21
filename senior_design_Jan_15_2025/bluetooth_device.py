@@ -25,22 +25,11 @@ class BluetoothDevice:
         while self.client.is_connected:
             response = await self.client.read_gatt_char(self.read_uuid)
             logging.info("Received: %s", response.decode())
-            await self.read_queue.put(response.decode())  # Send data to the processing queue
+            await self.read_queue.put(response.decode())  # Enqueue data for external handling
             await asyncio.sleep(1)
 
-    async def process_data(self):
-        # Process received data and check for faults
-        while True:
-            data = await self.read_queue.get()
-            logging.info("Processing data: %s", data)
-            if data.isdigit() and int(data) > self.fault_upper_limit:
-                logging.warning("Fault detected at %s!", self.address)
-                await self.write_queue.put("FAULT")
-            else:
-                await self.write_queue.put("OK")
-
     async def switch_relay(self):
-        # Handle outgoing commands
+        # Continuously process outgoing commands
         while True:
             message = await self.write_queue.get()
             logging.info("Sending message: %s", message)
@@ -57,7 +46,6 @@ class BluetoothDevice:
         logging.info("Connected to %s", self.address)
         tasks = [
             asyncio.create_task(self.read_from_device()),
-            asyncio.create_task(self.process_data()),
             asyncio.create_task(self.switch_relay()),
         ]
         await asyncio.gather(*tasks)
@@ -69,8 +57,7 @@ class BluetoothDevice:
 
     async def perm_open_breaker(self):
         # Permanently open the device
-        self.is_closed = False
-        self.perm_open = True
+        self.is_closed, self.perm_open = False, True
         logging.info("%s permanently opened.", self.address)
 
     async def close(self):
