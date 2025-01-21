@@ -1,20 +1,19 @@
 import asyncio
 from initial_values import setup_initial_values
 
-def main():
-    # Initialize grid and devices
-    grid, pico1, pico2 = setup_initial_values()
-    print("Grid and devices initialized.")
+async def main():
+    # Setup initial values and devices
+    grid, pico1, pico2_end = await setup_initial_values()
 
-    # Start connecting devices in the grid asynchronously
-    async def initialize_devices():
-        lock = asyncio.Lock()
-        await asyncio.gather(
-            pico1.open_connection(lock),
-            pico2.open_connection(lock)
-        )
+    # Read data from devices
+    data1 = await pico1.read_queue.get()
+    data2 = await pico2_end.read_queue.get()
+    print(f"Pico1 received: {data1}")
+    print(f"Pico2_end received: {data2}")
 
-    asyncio.run(initialize_devices())
+    # Write back names and information to devices
+    await pico1.write_queue.put(f"Name: Pico1, Data: {data1}")
+    await pico2_end.write_queue.put(f"Name: Pico2_end, Data: {data2}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
