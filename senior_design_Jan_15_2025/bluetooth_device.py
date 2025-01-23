@@ -24,7 +24,7 @@ class BluetoothDevice:
         # Continuously read data from the device
         while self.client.is_connected:
             response = await self.client.read_gatt_char(self.read_uuid)
-            logging.info("Received: %s", response.decode())
+            print("Received: %s", response.decode())
             await self.read_queue.put(response.decode())  # Enqueue data for external handling
             await asyncio.sleep(1)
 
@@ -32,18 +32,18 @@ class BluetoothDevice:
         # Continuously process outgoing commands
         while True:
             message = await self.write_queue.get()
-            logging.info("Sending message: %s", message)
+            print("Sending message: %s", message)
             await self.client.write_gatt_char(self.write_characteristic_uuid, message.encode())
             await asyncio.sleep(1)
 
     async def open_connection(self, lock: asyncio.Lock):
         # Establish connection with the Bluetooth device
-        logging.info("Connecting to %s", self.address)
+        print("Connecting to %s", self.address)
         async with lock:
             self.client = BleakClient(self.address)
             await self.client.connect()
 
-        logging.info("Connected to %s", self.address)
+        print("Connected to %s", self.address)
         tasks = [
             asyncio.create_task(self.read_from_device()),
             asyncio.create_task(self.switch_relay()),
