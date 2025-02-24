@@ -59,36 +59,48 @@ class BluetoothDevice:
 
     async def set_perm_open(self):
         self.perm_open = True
-        await self.change_relay_state(False)
+        await change_relay_state(False)
 
     async def set_state_open(self):
-        await self.change_relay_state(False)
+        await change_relay_state(False)
 
     async def set_state_close(self):
         if self.perm_open:
             print(f"{self.name} is permanently open and cannot be closed")
         else:
-            await self.change_relay_state(True)
-
-    async def change_relay_state(self, new_state):
-        async with asyncio.Lock():
-            self.set_state = new_state
-            await self.switch_relay()
-            print(f"Relay state for {self.address} set to {'ON' if new_state else 'OFF'}")
-            self.state = new_state
+            await change_relay_state(True)
 
     def get_state(self):
         return self.state
 
+async def change_relay_state(device, new_state):
+    async with asyncio.Lock():
+        device.set_state = new_state
+        await device.switch_relay()
+        print("Relay state for %s set to %s", device.address, "ON" if new_state else "OFF")
 
 async def main():
     lock = asyncio.Lock()
     devices = [
-        BluetoothDevice("Device1", "28:CD:C1:11:90:2E"),
-        BluetoothDevice("Device2", "28:CD:C1:0E:C3:D7"),
+        # BluetoothDevice("Device1", "28:CD:C1:11:90:2E"),
+        BluetoothDevice("Device2", "28:CD:C1:0E:C3:D6"),
     ]
     
     await asyncio.gather(*(device.open_connection(lock) for device in devices))
+
+    for device in devices:
+        print(f"\nTesting {device.name} ({device.address}):")
+
+        print(f"Initial state: {device.get_state()}")
+
+        print("Opening relay...")
+        await device.set_state_open()
+        print(f"State after open: {device.get_state()}")
+
+        print("Closing relay...")
+        await device.set_state_close()
+        print(f"State after close: {device.get_state()}")
+
 
 
 if __name__ == "__main__":

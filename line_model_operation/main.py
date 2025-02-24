@@ -2,20 +2,20 @@ import bluetooth_device as bd
 import route as r
 
 # Create breakers
-c1 = bd.BluetoothDevice("c1", state=True)
-c2 = bd.BluetoothDevice("c2", state=True)
-c3 = bd.BluetoothDevice("c3", state=True)
-b1 = bd.BluetoothDevice("b1", state=True)
-b2 = bd.BluetoothDevice("b2", state=True)
-b3 = bd.BluetoothDevice("b3", state=True)
-k1 = bd.BluetoothDevice("k1", state=True)
-k2 = bd.BluetoothDevice("k2", state=True)
-k3 = bd.BluetoothDevice("k3", state=True)
+c1 = bd.BluetoothDevice("c1", "28:CD:C1:11:90:2E", state=True)
+c2 = bd.BluetoothDevice("c2", "28:CD:C1:11:90:2E", state=True)
+c3 = bd.BluetoothDevice("c3", "28:CD:C1:11:90:2E", state=True)
+b1 = bd.BluetoothDevice("b1", "28:CD:C1:11:90:2E", state=True)
+b2 = bd.BluetoothDevice("b2", "28:CD:C1:11:90:2E", state=True)
+b3 = bd.BluetoothDevice("b3", "28:CD:C1:11:90:2E", state=True)
+k1 = bd.BluetoothDevice("k1", "28:CD:C1:11:90:2E", state=True)
+k2 = bd.BluetoothDevice("k2", "28:CD:C1:11:90:2E", state=True)
+k3 = bd.BluetoothDevice("k3", "28:CD:C1:11:90:2E", state=True)
 
 # Create end breakers
-cbend = bd.BluetoothDevice("cbend", state=False)
-ckend = bd.BluetoothDevice("ckend", state=False)
-bkend = bd.BluetoothDevice("bkend", state=False)
+cbend = bd.BluetoothDevice("cbend", "28:CD:C1:11:90:2E", state=False)
+ckend = bd.BluetoothDevice("ckend", "28:CD:C1:11:90:2E", state=False)
+bkend = bd.BluetoothDevice("bkend", "28:CD:C1:11:90:2E", state=False)
 
 # Create routes
 cherry = r.Route(
@@ -27,6 +27,8 @@ cherry = r.Route(
         "kiwi": ckend
     }
 )
+
+await cherry.initialize()
 
 banana = r.Route(
     fault_ranges=[400, 343, 300, 267],
@@ -83,9 +85,9 @@ def test_kiwi_k1_k2_fault():
 run_test("Test 1: Fault between C2 and End Breakers on Cherry", test_cherry_end_breakers_fault())
 run_test("Test 2: Fault between K1 and K2 on Kiwi", test_kiwi_k1_k2_fault())
 
-p1 = bd.BluetoothDevice("c1", state=True)
-p2 = bd.BluetoothDevice("c2", state=True)
-pend = bd.BluetoothDevice("pend", state=False)
+p1 = bd.BluetoothDevice("c1", "28:CD:C1:11:90:2E", state=True)
+p2 = bd.BluetoothDevice("c2",  "28:CD:C1:11:90:2E", state=True)
+pend = bd.BluetoothDevice("pend", "28:CD:C1:11:90:2E", state=False)
 
 single_route_test = r.Route(
     fault_ranges=[600, 500, 100],
