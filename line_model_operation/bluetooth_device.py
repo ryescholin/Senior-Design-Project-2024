@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import threading
 from bleak import BleakClient, uuids, BleakScanner
 
 class BluetoothDevice:
@@ -82,26 +83,29 @@ async def change_relay_state(device, new_state):
 async def main():
     lock = asyncio.Lock()
     devices = [
-        # BluetoothDevice("Device1", "28:CD:C1:11:90:2E"),
         BluetoothDevice("Device2", "28:CD:C1:0E:C3:D6"),
     ]
     
-    await asyncio.gather(*(device.open_connection(lock) for device in devices))
+    # Run Bluetooth device tasks
+    bt_task = asyncio.gather(*(device.open_connection(lock) for device in devices))
 
-    for device in devices:
-        print(f"\nTesting {device.name} ({device.address}):")
+    # Run tests in a separate thread
+    loop = asyncio.get_running_loop()
+    print("hit1")
+    test_thread = threading.Thread(target=run_tests, args=(loop,))
+    print("hit 2")
+    test_thread.start()
 
-        print(f"Initial state: {device.get_state()}")
+    await bt_task  # Let Bluetooth tasks run
 
-        print("Opening relay...")
-        await device.set_state_open()
-        print(f"State after open: {device.get_state()}")
+def run_tests(loop):
+    asyncio.run_coroutine_threadsafe(run_all_tests(), loop)
 
-        print("Closing relay...")
-        await device.set_state_close()
-        print(f"State after close: {device.get_state()}")
-
-
+async def run_all_tests():
+    run_test("Test 1: Fault between C2 and End Breakers on Cherry", test_cherry_end_breakers_fault())
+    run_test("Test 2: Fault between K1 and K2 on Kiwi", test_kiwi_k1_k2_fault())
+    run_test("Test 3: Single Route with Power Line", test_single_route_power_line())
+    print("\nAll specified tests completed.")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(name)-8s %(levelname)s: %(message)s")
