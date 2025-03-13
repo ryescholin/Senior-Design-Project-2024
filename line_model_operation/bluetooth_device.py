@@ -6,9 +6,9 @@ import threading
 from bleak import BleakClient, uuids, BleakScanner
 
 class BluetoothDevice:
-    def __init__(self, name: str, address: str, fault_upper_limit=400, state=True):
+    def __init__(self, address: str, fault_upper_limit=400, state=True):
         self.address = address
-        self.name = name
+        self.name = None
         self.write_characteristic_uuid = uuids.normalize_uuid_16(0x2A6E)
         self.read_uuid = uuids.normalize_uuid_16(0x2A6F)
         self.client = None
@@ -25,8 +25,9 @@ class BluetoothDevice:
             print(f"Received response from {self.client.address}: {decoded_response}")
 
             parts = decoded_response.split(",", 1)
-            self.state = parts[0]
-            self.current = str(parts[1]) if len(parts) > 1 else None
+            self.name = parts[0]
+            self.name = parts[1]
+            self.current = str(parts[2]) if len(parts) > 2 else None
             await asyncio.sleep(5)
 
     async def switch_relay(self):
@@ -83,30 +84,31 @@ async def change_relay_state(device, new_state):
 async def main():
     lock = asyncio.Lock()
     devices = [
-        BluetoothDevice("Device2", "28:CD:C1:0E:C3:D6"),
+        BluetoothDevice("28:CD:C1:0E:C3:D6"),  
+        BluetoothDevice("28:CD:C1:11:91:FC"),
     ]
     
-    # Run Bluetooth device tasks
-    bt_task = asyncio.gather(*(device.open_connection(lock) for device in devices))
+    # Open connections
+    connection_tasks = [device.open_connection(lock) for device in devices]
+    await asyncio.gather(*connection_tasks)
 
-    # Run tests in a separate thread
-    loop = asyncio.get_running_loop()
-    print("hit1")
-    test_thread = threading.Thread(target=run_tests, args=(loop,))
-    print("hit 2")
-    test_thread.start()
+    # Test relay switching
+    for device in devices:
+        print(f"Testing relay control for {device.address}...")
+        await change_relay_state(device, True)  # Turn relay on
+        await asyncio.sleep(2)
+        await change_relay_state(device, False)  # Turn relay off
+        await asyncio.sleep(2)
 
-    await bt_task  # Let Bluetooth tasks run
+    # Test current reading
+    for device in devices:
+        print(f"Testing current reading for {device.address}...")
+        await asyncio.sleep(5)  # Allow time for readings to come in
+        print(f"Current for {device.address}: {device.current}")
 
-def run_tests(loop):
-    asyncio.run_coroutine_threadsafe(run_all_tests(), loop)
-
-async def run_all_tests():
-    run_test("Test 1: Fault between C2 and End Breakers on Cherry", test_cherry_end_breakers_fault())
-    run_test("Test 2: Fault between K1 and K2 on Kiwi", test_kiwi_k1_k2_fault())
-    run_test("Test 3: Single Route with Power Line", test_single_route_power_line())
-    print("\nAll specified tests completed.")
+    print("Tests completed.")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(name)-8s %(levelname)s: %(message)s")
     asyncio.run(main())
+
