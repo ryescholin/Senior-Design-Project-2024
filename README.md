@@ -15,10 +15,9 @@ Faults in power delivery equipment can cause widespread outages, impacting criti
   - Sensors and relays integrated into the power grid for fault detection  
 
 - **Software & Programming:**  
-  - Embedded C/C++ for Pico programming  
   - Python for communication protocols and data handling  
-  - Network communication protocols (UART, I2C, SPI) for device interaction  
-  - Simulation tools for power flow and fault analysis  
+  - Network communication protocols for device interaction  
+  - Simulation tools for power flow and fault analysis 
 
 - **System Design:**  
   - Distributed control architecture using microcontrollers  
